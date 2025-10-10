@@ -1,0 +1,45 @@
+# Python
+1.py
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Ignore everything except flutter_app
+/*
+!/flutter_app/
+!.gitignore
+!README.md
+
+# Flutter specific (inside flutter_app)
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.packages
+flutter_app/build/
+flutter_app/.idea/
+flutter_app/*.iml
+flutter_app/.vscode/
+
+# Platform specific
+flutter_app/ios/Pods/
+flutter_app/ios/.symlinks/
+flutter_app/ios/Flutter/Flutter.framework
+flutter_app/ios/Flutter/Flutter.podspec
+flutter_app/android/.gradle/
+flutter_app/android/captures/
+flutter_app/android/local.properties
+flutter_app/android/.cxx/
+flutter_app/android/app/google-services.json
+
+# Misc
+.DS_Store
+*.log
+*.tmp
+*.temp
+

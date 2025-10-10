@@ -1,0 +1,83 @@
+name: at_gateway_app
+description: AT命令网关客户端 - 连接4G/5G模块的移动应用
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 状态管理和路由
+  get: ^4.6.6
+  
+  # WebSocket通信
+  web_socket_channel: ^2.4.0
+  
+  # WebSocket服务器
+  shelf: ^1.4.1
+  shelf_web_socket: ^1.0.4
+  shelf_static: ^1.1.2
+  mime: ^1.0.4
+  
+  # WebView
+  webview_flutter: ^4.4.2
+  
+  # JSON序列化
+  json_annotation: ^4.8.1
+  
+  # 本地存储
+  shared_preferences: ^2.2.2
+  
+  # 本地通知
+  flutter_local_notifications: ^19.0.0
+  
+  # 权限管理
+  permission_handler: ^11.0.1
+  
+  # UI相关
+  flutter_screenutil: ^5.9.0
+  cupertino_icons: ^1.0.6
+  
+  # 图表
+  fl_chart: ^0.66.0
+  
+  # 时间格式化
+  intl: ^0.18.1
+  
+  # 动画
+  animations: ^2.0.11
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/web/
+    - assets/web/at/
+    - assets/web/icons/
+    - assets/web/network/
+    - assets/web/network/dial/
+    - assets/web/network/info/
+    - assets/web/network/setting/
+    - assets/web/scripts/
+    - assets/web/sms/
+    - assets/web/sms/center/
+    - assets/web/sms/settings/
+    - assets/web/system/
+    - assets/web/system/info/
+    - assets/web/system/upgrade/
+  
+  # fonts:
+  #   - family: CustomFont
+  #     fonts:
+  #       - asset: fonts/CustomFont-Regular.ttf
+
