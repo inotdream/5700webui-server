@@ -15,6 +15,7 @@ ENV/
 !/flutter_app/
 !.gitignore
 !README.md
+!.github/
 
 # Flutter specific (inside flutter_app)
 flutter_app/.dart_tool/
