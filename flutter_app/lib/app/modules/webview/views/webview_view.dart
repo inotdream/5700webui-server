@@ -68,6 +68,96 @@ class WebViewView extends GetView<WebViewController> {
         ],
       ),
       body: Obx(() {
+        // macOS浏览器模式
+        if (controller.shouldUseBrowser.value) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.language_rounded,
+                    size: 80,
+                    color: AppTheme.primaryColor,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'macOS 浏览器模式',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '由于macOS平台限制，Web界面将在外部浏览器中打开',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          '访问地址：',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          controller.currentUrl.value,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 16,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: controller.openInBrowser,
+                        icon: const Icon(Icons.open_in_browser),
+                        label: const Text('在浏览器中打开'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          controller.shouldUseBrowser.value = false;
+                          controller.onInit();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('重试内嵌'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
         // 显示错误信息
         if (controller.errorMessage.value.isNotEmpty) {
           return Center(

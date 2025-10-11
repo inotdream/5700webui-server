@@ -15,9 +15,16 @@ class ConsoleController extends GetxController {
   void onInit() {
     super.onInit();
     
-    // 监听原始数据
+    // 监听AT命令响应（用于AT控制台显示）
+    _tcpService.consoleResponseStream.listen((response) {
+      print('🎯 AT控制台收到命令响应: $response');
+      addLog('📥 $response', false);
+    });
+    
+    // 监听主动上报数据
     _tcpService.rawDataStream.listen((data) {
-      addLog('📥 $data', false);
+      print('🎯 AT控制台收到主动上报: $data');
+      addLog('📡 $data', false);
     });
     
     _addWelcomeMessage();

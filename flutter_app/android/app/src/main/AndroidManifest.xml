@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     
     <application
-        android:label="5700Webui"
+        android:label="5700WebUi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

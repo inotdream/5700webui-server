@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:get/get.dart';
 import 'package:webview_flutter/webview_flutter.dart' as wv;
+import 'package:url_launcher/url_launcher.dart';
 import '../../../services/websocket_server_service.dart';
 
 class WebViewController extends GetxController {
@@ -14,10 +16,13 @@ class WebViewController extends GetxController {
   final currentUrl = ''.obs;
   final errorMessage = ''.obs;
   final isServerReady = false.obs;
+  final isMacOS = false.obs;
+  final shouldUseBrowser = false.obs;
   
   @override
   void onInit() {
     super.onInit();
+    isMacOS.value = Platform.isMacOS;
     _initWebView();
   }
   
@@ -51,38 +56,84 @@ class WebViewController extends GetxController {
       
       print('创建WebView，URL: $url');
       
-      _webViewController = wv.WebViewController()
-        ..setJavaScriptMode(wv.JavaScriptMode.unrestricted)
-        ..setBackgroundColor(const Color(0x00000000))
-        ..setNavigationDelegate(
-          wv.NavigationDelegate(
-            onPageStarted: (String url) {
-              print('开始加载页面: $url');
-              isLoading.value = true;
-              errorMessage.value = '';
-            },
-            onPageFinished: (String url) {
-              print('页面加载完成: $url');
-              isLoading.value = false;
-            },
-            onWebResourceError: (wv.WebResourceError error) {
-              print('WebView资源错误: ${error.description}, 类型: ${error.errorType}');
-              errorMessage.value = '加载失败: ${error.description}';
-            },
-            onNavigationRequest: (wv.NavigationRequest request) {
-              print('导航请求: ${request.url}');
-              return wv.NavigationDecision.navigate;
-            },
-          ),
-        );
-      
-      // 延迟加载页面，确保WebView完全初始化
-      await Future.delayed(const Duration(milliseconds: 300));
-      await _webViewController!.loadRequest(Uri.parse(url));
+      // 在macOS上，如果WebView创建失败，直接使用浏览器
+      if (isMacOS.value) {
+        print('macOS平台，检测WebView支持...');
+        try {
+          _webViewController = wv.WebViewController()
+            ..setJavaScriptMode(wv.JavaScriptMode.unrestricted)
+            ..setBackgroundColor(const Color(0x00000000))
+            ..setNavigationDelegate(
+              wv.NavigationDelegate(
+                onPageStarted: (String url) {
+                  print('开始加载页面: $url');
+                  isLoading.value = true;
+                  errorMessage.value = '';
+                },
+                onPageFinished: (String url) {
+                  print('页面加载完成: $url');
+                  isLoading.value = false;
+                },
+                onWebResourceError: (wv.WebResourceError error) {
+                  print('WebView资源错误: ${error.description}, 类型: ${error.errorType}');
+                  errorMessage.value = '加载失败: ${error.description}';
+                },
+                onNavigationRequest: (wv.NavigationRequest request) {
+                  print('导航请求: ${request.url}');
+                  return wv.NavigationDecision.navigate;
+                },
+              ),
+            );
+          
+          // 延迟加载页面，确保WebView完全初始化
+          await Future.delayed(const Duration(milliseconds: 300));
+          await _webViewController!.loadRequest(Uri.parse(url));
+          
+        } catch (e) {
+          print('macOS WebView创建失败，使用浏览器模式: $e');
+          shouldUseBrowser.value = true;
+          isLoading.value = false;
+        }
+      } else {
+        // 非macOS平台，正常创建WebView
+        _webViewController = wv.WebViewController()
+          ..setJavaScriptMode(wv.JavaScriptMode.unrestricted)
+          ..setBackgroundColor(const Color(0x00000000))
+          ..setNavigationDelegate(
+            wv.NavigationDelegate(
+              onPageStarted: (String url) {
+                print('开始加载页面: $url');
+                isLoading.value = true;
+                errorMessage.value = '';
+              },
+              onPageFinished: (String url) {
+                print('页面加载完成: $url');
+                isLoading.value = false;
+              },
+              onWebResourceError: (wv.WebResourceError error) {
+                print('WebView资源错误: ${error.description}, 类型: ${error.errorType}');
+                errorMessage.value = '加载失败: ${error.description}';
+              },
+              onNavigationRequest: (wv.NavigationRequest request) {
+                print('导航请求: ${request.url}');
+                return wv.NavigationDecision.navigate;
+              },
+            ),
+          );
+        
+        // 延迟加载页面，确保WebView完全初始化
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _webViewController!.loadRequest(Uri.parse(url));
+      }
       
     } catch (e) {
       print('创建WebView失败: $e');
-      errorMessage.value = '创建WebView失败: $e';
+      if (isMacOS.value) {
+        shouldUseBrowser.value = true;
+        isLoading.value = false;
+      } else {
+        errorMessage.value = '创建WebView失败: $e';
+      }
     }
   }
   
@@ -96,6 +147,25 @@ class WebViewController extends GetxController {
   
   void goForward() {
     webViewController.goForward();
+  }
+  
+  /// 在浏览器中打开Web界面
+  Future<void> openInBrowser() async {
+    final port = _wsService.serverPort.value;
+    final url = 'http://127.0.0.1:$port';
+    
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        print('已在浏览器中打开: $url');
+      } else {
+        Get.snackbar('错误', '无法打开浏览器，请手动访问: $url');
+      }
+    } catch (e) {
+      print('打开浏览器失败: $e');
+      Get.snackbar('错误', '打开浏览器失败: $e');
+    }
   }
   
   /// 清理WebView缓存

@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.example.at_gateway_app"
+    namespace "com.at_gateway_app.webui5700"
     compileSdkVersion 36
 
     compileOptions {

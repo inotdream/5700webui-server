@@ -1,5 +1,5 @@
-name: at_gateway_app
-description: AT命令网关客户端 - 连接4G/5G模块的移动应用
+name: webui_5700
+description: 5700WebUi - AT命令网关客户端，连接4G/5G模块的移动应用
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -36,6 +36,9 @@ dependencies:
   
   # 权限管理
   permission_handler: ^11.0.1
+  
+  # URL启动器
+  url_launcher: ^6.2.2
   
   # UI相关
   flutter_screenutil: ^5.9.0

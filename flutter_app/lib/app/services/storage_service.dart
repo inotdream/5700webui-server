@@ -36,4 +36,8 @@ class StorageService extends GetxService {
   // 主题模式
   String get themeMode => _prefs.getString('theme_mode') ?? 'system';
   set themeMode(String value) => _prefs.setString('theme_mode', value);
+
+  // WebSocket服务器端口
+  int get wsPort => _prefs.getInt('ws_port') ?? 8765;
+  set wsPort(int value) => _prefs.setInt('ws_port', value);
 }

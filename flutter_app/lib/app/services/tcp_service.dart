@@ -16,6 +16,10 @@ class TcpService extends GetxService {
   final _responseController = StreamController<String>.broadcast();
   Stream<String> get responseStream => _responseController.stream;
   
+  // AT控制台响应流（用于Flutter内部AT控制台显示）
+  final _consoleResponseController = StreamController<String>.broadcast();
+  Stream<String> get consoleResponseStream => _consoleResponseController.stream;
+  
   // 各类事件流
   final _smsController = StreamController<SmsModel>.broadcast();
   Stream<SmsModel> get smsStream => _smsController.stream;
@@ -68,6 +72,7 @@ class TcpService extends GetxService {
       final host = _storageService.tcpHost;
       final port = _storageService.tcpPort;
       
+      print('🔗 尝试连接到 $host:$port');
       connectionStatus.value = '连接中...';
       
       _socket = await Socket.connect(
@@ -103,11 +108,25 @@ class TcpService extends GetxService {
       await _initATConfig();
       
     } catch (e) {
+      final host = _storageService.tcpHost;
+      final port = _storageService.tcpPort;
+      
       print('❌ TCP连接失败: $e');
+      print('🔍 连接详情:');
+      print('   - 主机: $host');
+      print('   - 端口: $port');
+      print('   - 超时: 10秒');
+      print('   - 错误类型: ${e.runtimeType}');
+      
       isConnected.value = false;
-      connectionStatus.value = '连接失败';
+      connectionStatus.value = '连接失败: $e';
       _isReconnecting = false;
-      _reconnect();
+      
+      // 如果启用了自动重连，则启动重连
+      if (_storageService.autoConnect) {
+        print('🔄 自动重连已启用，将在5秒后重试...');
+        _reconnect();
+      }
     }
   }
   
@@ -184,25 +203,51 @@ class TcpService extends GetxService {
           // 取消超时定时器
           _responseTimer?.cancel();
           
-          // 完成响应并广播完整的响应数据
+          // 完成响应
           _commandCompleter!.complete(response);
-          _rawDataController.add(response); // 广播完整响应
           _commandCompleter = null;
+          
+          // 广播到AT控制台响应流（用于Flutter内部AT控制台显示）
+          _consoleResponseController.add(response);
+          
           _responseBuffer.clear();
         }
       } else {
-        // 非命令响应时，累积数据直到收到完整消息
+        // 非命令响应时，处理主动上报数据
         _responseBuffer.write(text);
         
         // 检查是否是完整的主动上报消息
         final buffered = _responseBuffer.toString();
-        if (buffered.contains('\n')) {
+        print('🔍 检查主动上报数据: $buffered');
+        
+        // 更宽松的检测条件 - 检测常见的主动上报消息
+        if (buffered.contains('\r\n') || 
+            buffered.contains('\n') || 
+            buffered.contains('+CMTI:') ||
+            buffered.contains('RING') ||
+            buffered.contains('+CLIP:') ||
+            buffered.contains('^CEND:') ||
+            buffered.contains('^HCSQ:') ||
+            buffered.contains('^CERSSI:') ||
+            buffered.contains('+') ||  // 任何以+开头的消息
+            buffered.contains('^')) {  // 任何以^开头的消息
+          
+          print('📡 检测到主动上报消息，广播到rawDataStream: $buffered');
+          
           // 广播完整的主动上报消息
           _rawDataController.add(buffered);
           
           // 解析主动上报消息
           _parseUnsolicitedMessage(buffered);
           
+          _responseBuffer.clear();
+        }
+        
+        // 如果缓冲区太大，强制处理（防止内存泄漏）
+        if (_responseBuffer.length > 1000) {
+          print('⚠️ 缓冲区过大，强制处理数据');
+          _rawDataController.add(buffered);
+          _parseUnsolicitedMessage(buffered);
           _responseBuffer.clear();
         }
       }
@@ -214,11 +259,23 @@ class TcpService extends GetxService {
 
   // 解析主动上报消息
   void _parseUnsolicitedMessage(String message) {
-    final lines = message.split('\r\n');
+    print('🔍 解析主动上报消息: $message');
+    
+    // 尝试多种分割方式
+    List<String> lines = [];
+    if (message.contains('\r\n')) {
+      lines = message.split('\r\n');
+    } else if (message.contains('\n')) {
+      lines = message.split('\n');
+    } else {
+      lines = [message];
+    }
     
     for (var line in lines) {
       line = line.trim();
       if (line.isEmpty) continue;
+      
+      print('📝 处理行: $line');
       
       // 新短信通知
       if (line.contains('+CMTI:')) {
@@ -235,6 +292,10 @@ class TcpService extends GetxService {
       // 信号数据
       else if (line.contains('^HCSQ:') || line.contains('^CERSSI:')) {
         _handleSignalData(line);
+      }
+      // 其他以+或^开头的主动上报消息
+      else if (line.startsWith('+') || line.startsWith('^')) {
+        print('📡 其他主动上报消息: $line');
       }
     }
   }
@@ -356,6 +417,29 @@ class TcpService extends GetxService {
     }
   }
 
+  // 测试网络连接
+  Future<bool> testConnection() async {
+    final host = _storageService.tcpHost;
+    final port = _storageService.tcpPort;
+    
+    print('🧪 测试网络连接: $host:$port');
+    
+    try {
+      final socket = await Socket.connect(
+        host,
+        port,
+        timeout: const Duration(seconds: 5),
+      );
+      
+      await socket.close();
+      print('✅ 网络连接测试成功');
+      return true;
+    } catch (e) {
+      print('❌ 网络连接测试失败: $e');
+      return false;
+    }
+  }
+
   // 重连
   void _reconnect() {
     // 如果已在重连中或已连接，则不重复触发
@@ -393,6 +477,7 @@ class TcpService extends GetxService {
     _socket = null;
     
     _responseController.close();
+    _consoleResponseController.close();
     _smsController.close();
     _callController.close();
     _signalController.close();

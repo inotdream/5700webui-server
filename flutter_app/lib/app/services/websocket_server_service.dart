@@ -9,6 +9,7 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:mime/mime.dart';
 import 'tcp_service.dart';
+import 'storage_service.dart';
 
 /// WebSocket服务器服务
 /// 为Web前端提供WebSocket接口,转发TCP AT设备的数据
@@ -16,6 +17,7 @@ class WebSocketServerService extends GetxService {
   HttpServer? _server;
   final _clients = <WebSocketChannel>{};
   final _tcpService = Get.find<TcpService>();
+  late final StorageService _storageService;
   
   final isRunning = false.obs;
   final serverPort = 8765.obs;
@@ -24,17 +26,27 @@ class WebSocketServerService extends GetxService {
   StreamSubscription? _smsSubscription;
   StreamSubscription? _callSubscription;
   StreamSubscription? _signalSubscription;
+  StreamSubscription? _rawDataSubscription;
 
   @override
   void onInit() {
     super.onInit();
+    _storageService = Get.find<StorageService>();
     _setupEventListeners();
   }
 
   /// 设置事件监听器
   void _setupEventListeners() {
-    // 注意：不监听原始数据流，只在命令响应时返回数据
-    // 这样才能和 Python 网关的行为完全一致
+    // 监听原始数据流（主动上报数据）- 广播给所有客户端
+    _rawDataSubscription = _tcpService.rawDataStream.listen((data) {
+      _broadcastToClients({
+        'type': 'raw_data',
+        'data': data,
+      });
+    });
+
+    // 注意：AT命令响应不在这里广播，而是在 _handleClientMessage 中直接返回给发送命令的客户端
+    // 这样可以避免重复响应，并且保持点对点通信
     
     // 监听短信事件
     _smsSubscription = _tcpService.smsStream.listen((sms) {
@@ -197,14 +209,15 @@ class WebSocketServerService extends GetxService {
   }
 
   /// 启动WebSocket服务器
-  Future<void> startServer({int port = 8765}) async {
+  Future<void> startServer({int? port}) async {
     if (isRunning.value) {
       print('WebSocket服务器已在运行');
       return;
     }
 
     try {
-      serverPort.value = port;
+      // 如果没有指定端口，从存储中读取
+      serverPort.value = port ?? _storageService.wsPort;
 
       final wsHandler = webSocketHandler((WebSocketChannel webSocket) {
         print('新的WebSocket客户端连接');
@@ -243,11 +256,11 @@ class WebSocketServerService extends GetxService {
       _server = await shelf_io.serve(
         handler,
         InternetAddress.anyIPv4,
-        port,
+        serverPort.value,
       );
 
       isRunning.value = true;
-      print('✅ WebSocket服务器启动成功: ws://0.0.0.0:$port');
+      print('✅ WebSocket服务器启动成功: ws://0.0.0.0:${serverPort.value}');
     } catch (e) {
       print('❌ WebSocket服务器启动失败: $e');
       isRunning.value = false;
@@ -360,11 +373,53 @@ class WebSocketServerService extends GetxService {
     clientCount.value = _clients.length;
   }
 
+  /// 修改WebSocket服务器端口
+  Future<bool> changePort(int newPort) async {
+    if (newPort < 1024 || newPort > 65535) {
+      print('❌ 端口号必须在1024-65535之间');
+      return false;
+    }
+
+    try {
+      // 停止当前服务器
+      await stopServer();
+      
+      // 保存新端口到存储
+      _storageService.wsPort = newPort;
+      
+      // 使用新端口重新启动服务器
+      await startServer(port: newPort);
+      
+      print('✅ WebSocket端口已修改为: $newPort');
+      return true;
+    } catch (e) {
+      print('❌ 修改WebSocket端口失败: $e');
+      return false;
+    }
+  }
+
+  /// 获取当前端口
+  int getCurrentPort() {
+    return serverPort.value;
+  }
+
+  /// 检查端口是否可用
+  Future<bool> isPortAvailable(int port) async {
+    try {
+      final server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+      await server.close();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   @override
   void onClose() {
     _smsSubscription?.cancel();
     _callSubscription?.cancel();
     _signalSubscription?.cancel();
+    _rawDataSubscription?.cancel();
     stopServer();
     super.onClose();
   }
@@ -377,7 +432,7 @@ class WebSocketServerService extends GetxService {
     return 'ws://0.0.0.0:${serverPort.value}';
   }
 
-  /// 获取所有网络接口的IP地址
+  /// 获取所有网络接口的IP地址（WebSocket）
   Future<List<String>> getLocalIPAddresses() async {
     final addresses = <String>[];
     try {
@@ -391,6 +446,24 @@ class WebSocketServerService extends GetxService {
       }
     } catch (e) {
       print('获取IP地址失败: $e');
+    }
+    return addresses;
+  }
+
+  /// 获取所有网络接口的HTTP地址
+  Future<List<String>> getHttpAddresses() async {
+    final addresses = <String>[];
+    try {
+      final interfaces = await NetworkInterface.list();
+      for (var interface in interfaces) {
+        for (var addr in interface.addresses) {
+          if (addr.type == InternetAddressType.IPv4) {
+            addresses.add('http://${addr.address}:${serverPort.value}');
+          }
+        }
+      }
+    } catch (e) {
+      print('获取HTTP地址失败: $e');
     }
     return addresses;
   }

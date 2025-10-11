@@ -68,12 +68,84 @@ class SettingsView extends GetView<SettingsController> {
                   )),
                   onTap: controller.reconnect,
                 ),
+                Divider(color: Theme.of(context).dividerColor),
+                _buildActionTile(context, 
+                  icon: Icons.network_check_rounded,
+                  title: '测试连接',
+                  subtitle: const Text('测试TCP连接是否正常'),
+                  onTap: controller.testConnection,
+                ),
               ]),
               SizedBox(height: 24.h),
               
               // WebSocket 服务器设置
               _buildSectionTitle(context, 'WebSocket服务器'),
               _buildSettingCard(context,[
+                // 端口配置
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '端口配置',
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: controller.wsPortController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              decoration: InputDecoration(
+                                labelText: 'WebSocket端口',
+                                hintText: '8765',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 8.h,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          ElevatedButton(
+                            onPressed: controller.saveWsConfig,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16.w,
+                                vertical: 8.h,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                            ),
+                            child: const Text('修改'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 12.h),
                 Padding(
                   padding: EdgeInsets.all(16.w),
                   child: Column(
@@ -157,7 +229,7 @@ class SettingsView extends GetView<SettingsController> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                '可用地址:',
+                                                'WebSocket地址:',
                                                 style: TextStyle(
                                                   color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
                                                   fontSize: 12.sp,
@@ -203,6 +275,82 @@ class SettingsView extends GetView<SettingsController> {
                                                           Icons.copy_rounded,
                                                           size: 12.sp,
                                                           color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.6),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                    ),
+                                    SizedBox(height: 12.h),
+                                    FutureBuilder<List<String>>(
+                                      future: wsServer.getHttpAddresses(),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                                          return Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'HTTP访问地址 (点击复制):',
+                                                style: TextStyle(
+                                                  color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
+                                                  fontSize: 12.sp,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              SizedBox(height: 4.h),
+                                              ...snapshot.data!.map((addr) => 
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    Clipboard.setData(ClipboardData(text: addr));
+                                                    Get.snackbar(
+                                                      '已复制',
+                                                      '可在浏览器中打开: $addr',
+                                                      snackPosition: SnackPosition.BOTTOM,
+                                                      duration: const Duration(seconds: 2),
+                                                    );
+                                                  },
+                                                  child: Container(
+                                                    margin: EdgeInsets.only(top: 4.h),
+                                                    padding: EdgeInsets.symmetric(
+                                                      horizontal: 8.w,
+                                                      vertical: 6.h,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: AppTheme.primaryColor.withOpacity(0.15),
+                                                      borderRadius: BorderRadius.circular(6.r),
+                                                      border: Border.all(
+                                                        color: AppTheme.primaryColor.withOpacity(0.3),
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.language_rounded,
+                                                          size: 14.sp,
+                                                          color: AppTheme.primaryColor,
+                                                        ),
+                                                        SizedBox(width: 8.w),
+                                                        Expanded(
+                                                          child: Text(
+                                                            addr,
+                                                            style: TextStyle(
+                                                              color: AppTheme.primaryColor,
+                                                              fontSize: 12.sp,
+                                                              fontWeight: FontWeight.w600,
+                                                              fontFamily: 'monospace',
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Icon(
+                                                          Icons.copy_rounded,
+                                                          size: 14.sp,
+                                                          color: AppTheme.primaryColor,
                                                         ),
                                                       ],
                                                     ),
