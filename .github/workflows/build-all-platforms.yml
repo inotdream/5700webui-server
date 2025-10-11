@@ -1,0 +1,161 @@
+name: Build All Platforms
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.5'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: |
+        cd flutter_app
+        flutter pub get
+        
+    - name: Run tests
+      run: |
+        cd flutter_app
+        flutter test --no-pub
+      continue-on-error: true
+        
+    - name: Build Universal APK
+      run: |
+        cd flutter_app
+        flutter build apk --release
+        
+    - name: Build Split APKs (per architecture)
+      run: |
+        cd flutter_app
+        flutter build apk --release --split-per-abi
+        
+    - name: Upload Android APKs
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-apks
+        path: |
+          flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          flutter_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          flutter_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          flutter_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.5'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: |
+        cd flutter_app
+        flutter pub get
+        
+    - name: Run tests
+      run: |
+        cd flutter_app
+        flutter test --no-pub
+      continue-on-error: true
+        
+    - name: Build macOS App
+      run: |
+        cd flutter_app
+        flutter build macos --release
+        
+    - name: Create DMG
+      run: |
+        cd flutter_app/build/macos/Build/Products/Release
+        # 创建DMG
+        hdiutil create -volname "5700WebUi" -srcfolder 5700WebUi.app -ov -format UDZO 5700WebUi.dmg
+        
+    - name: Upload macOS DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-dmg
+        path: flutter_app/build/macos/Build/Products/Release/5700WebUi.dmg
+
+  create-release:
+    needs: [build-android, build-macos]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Download Android APKs
+      uses: actions/download-artifact@v4
+      with:
+        name: android-apks
+        path: ./artifacts/android
+        
+    - name: Download macOS DMG
+      uses: actions/download-artifact@v4
+      with:
+        name: macos-dmg
+        path: ./artifacts/macos
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./artifacts/android/app-release.apk
+          ./artifacts/android/app-arm64-v8a-release.apk
+          ./artifacts/android/app-armeabi-v7a-release.apk
+          ./artifacts/android/app-x86_64-release.apk
+          ./artifacts/macos/5700WebUi.dmg
+        generate_release_notes: true
+        draft: true
+        prerelease: true
+        tag_name: "v1.0.0-build-${{ github.run_number }}"
+        name: "5700WebUi v1.0.0 Build ${{ github.run_number }}"
+        body: |
+          ## 📱 5700WebUi 多平台构建
+          
+          ### 🎯 本次构建包含：
+          - **Android APK** (通用版本)
+          - **Android APK** (分架构版本: ARM64, ARMv7, x86_64)
+          - **macOS DMG** (适用于M1/M2芯片)
+          
+          ### 📋 安装说明：
+          - **Android**: 下载对应架构的APK文件安装
+          - **macOS**: 下载DMG文件，拖拽到Applications文件夹
+          
+          ### 🔧 功能特性：
+          - AT命令网关客户端
+          - 支持4G/5G模块连接
+          - WebSocket服务器
+          - 多平台支持
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

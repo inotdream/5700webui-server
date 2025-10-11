@@ -1,11 +1,7 @@
-name: Build Android APK
+name: Build Android APK (Legacy)
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch: # 仅允许手动触发，推荐使用 build-all-platforms.yml
 
 jobs:
   build-android:

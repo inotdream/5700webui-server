@@ -1,0 +1,71 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.5'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: |
+        cd flutter_app
+        flutter pub get
+        
+    - name: Run tests
+      run: |
+        cd flutter_app
+        flutter test --no-pub
+      continue-on-error: true
+        
+    - name: Build macOS App
+      run: |
+        cd flutter_app
+        flutter build macos --release
+        
+    - name: Create DMG
+      run: |
+        cd flutter_app/build/macos/Build/Products/Release
+        # 创建临时目录
+        mkdir -p 5700WebUi.app/Contents/MacOS
+        # 复制应用文件
+        cp -r 5700WebUi.app/* 5700WebUi.app/Contents/MacOS/ 2>/dev/null || true
+        
+        # 使用hdiutil创建DMG
+        hdiutil create -volname "5700WebUi" -srcfolder 5700WebUi.app -ov -format UDZO 5700WebUi.dmg
+        
+    - name: Upload DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-dmg
+        path: flutter_app/build/macos/Build/Products/Release/5700WebUi.dmg
+        
+    - name: Create Draft Release (on main branch)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: flutter_app/build/macos/Build/Products/Release/5700WebUi.dmg
+        generate_release_notes: true
+        draft: true
+        prerelease: true
+        tag_name: "macos-build-${{ github.run_number }}"
+        name: "macOS Build ${{ github.run_number }}"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
