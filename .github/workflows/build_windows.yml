@@ -1,0 +1,99 @@
+name: 🪟 Build & Release Flutter Windows App
+
+on:
+  push:
+    tags:
+      - 'v*'         # 当你打 tag 时自动发布，例如 v1.0.0
+  workflow_dispatch:  # 也可手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # -------------------------------
+      # 1️⃣ 拉取项目源码
+      # -------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # -------------------------------
+      # 2️⃣ 安装最新稳定版 Flutter
+      # -------------------------------
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      # -------------------------------
+      # 3️⃣ 缓存 Flutter 构建依赖
+      # -------------------------------
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ./flutter_app/.dart_tool
+            ./flutter_app/build
+          key: ${{ runner.os }}-flutter-${{ hashFiles('flutter_app/pubspec.lock') }}
+
+      # -------------------------------
+      # 4️⃣ 启用 Windows 构建
+      # -------------------------------
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+        working-directory: ./flutter_app
+
+      # -------------------------------
+      # 5️⃣ 获取依赖
+      # -------------------------------
+      - name: Get Dependencies
+        run: flutter pub get
+        working-directory: ./flutter_app
+
+      # -------------------------------
+      # 6️⃣ 编译 Windows Release
+      # -------------------------------
+      - name: Build Windows Release
+        run: flutter build windows --release
+        working-directory: ./flutter_app
+
+      # -------------------------------
+      # 7️⃣ 打包成 ZIP
+      # -------------------------------
+      - name: Create ZIP Package
+        run: |
+          powershell Compress-Archive -Path flutter_app/build/windows/x64/runner/Release/* -DestinationPath 5700webui-server_windows_release.zip
+
+      # -------------------------------
+      # 8️⃣ 上传构建产物（供 Actions 下载）
+      # -------------------------------
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 5700webui-server-windows
+          path: 5700webui-server_windows_release.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # -------------------------------
+      # 9️⃣ 下载上一步打包好的文件
+      # -------------------------------
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: 5700webui-server-windows
+          path: ./release_files
+
+      # -------------------------------
+      # 🔟 自动发布到 GitHub Release
+      # -------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./release_files/5700webui-server_windows_release.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
