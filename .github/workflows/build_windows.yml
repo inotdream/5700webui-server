@@ -1,0 +1,50 @@
+name: 🪟 Build Flutter Windows Release
+
+on:
+  push:
+    branches:
+      - main       # 推送到 main 分支时自动编译
+  workflow_dispatch: # 手动触发支持
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      # 1️⃣ 拉取仓库代码
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ 安装 Flutter 环境
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      # 3️⃣ 启用 Windows 桌面支持
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+        working-directory: ./flutter_app
+
+      # 4️⃣ 获取依赖
+      - name: Get Dependencies
+        run: flutter pub get
+        working-directory: ./flutter_app
+
+      # 5️⃣ 编译 Windows Release 版本
+      - name: Build Windows Release
+        run: flutter build windows --release
+        working-directory: ./flutter_app
+
+      # 6️⃣ 压缩可执行文件为 ZIP 包
+      - name: Create ZIP Package
+        run: |
+          powershell Compress-Archive -Path flutter_app/build/windows/x64/runner/Release/* -DestinationPath 5700webui-server_windows_release.zip
+
+      # 7️⃣ 上传构建产物到 GitHub Actions（可下载）
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 5700webui-server-windows
+          path: 5700webui-server_windows_release.zip
