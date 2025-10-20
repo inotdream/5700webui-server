@@ -19,7 +19,7 @@ jobs:
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.24.6'
           channel: 'stable'
 
       # 3️⃣ 启用 Windows 桌面支持
