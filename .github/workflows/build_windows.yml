@@ -48,3 +48,12 @@ jobs:
         with:
           name: 5700webui-server-windows
           path: 5700webui-server_windows_release.zip
+      # 8️⃣ 自动发布到 GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "5700webui-server Build v${{ github.run_number }}"
+          files: 5700webui-server_windows_release.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
