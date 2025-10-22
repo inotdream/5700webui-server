@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'package:get/get.dart';
@@ -45,6 +46,11 @@ class TcpService extends GetxService {
   // 重连控制
   bool _isReconnecting = false;
   Timer? _reconnectTimer;
+  
+  // 命令队列和延迟控制
+  final _commandQueue = Queue<_CommandTask>();
+  bool _isProcessingQueue = false;
+  static const _commandDelay = Duration(milliseconds: 100); // 每条命令之间间隔100ms
 
   @override
   void onInit() {
@@ -147,8 +153,19 @@ class TcpService extends GetxService {
         _commandCompleter = null;
       }
       
+      // 清空命令队列
+      while (_commandQueue.isNotEmpty) {
+        final task = _commandQueue.removeFirst();
+        if (!task.completer.isCompleted) {
+          task.completer.completeError(Exception('连接已关闭'));
+        }
+      }
+      
       // 清空缓冲区
       _responseBuffer.clear();
+      
+      // 重置队列处理标志
+      _isProcessingQueue = false;
       
       // 关闭旧socket
       if (_socket != null) {
@@ -375,46 +392,92 @@ class TcpService extends GetxService {
     }
   }
 
-  // 发送AT命令
+  // 发送AT命令（公开接口，加入队列）
   Future<String> sendCommand(String command) async {
     if (!isConnected.value || _socket == null) {
       throw Exception('未连接到服务器');
     }
     
-    try {
-      // 确保命令以\r\n结尾
-      if (!command.endsWith('\r\n')) {
-        command += '\r\n';
-      }
-      
-      print('📤 发送命令: ${command.trim()}');
-      
-      // 创建响应完成器
-      _commandCompleter = Completer<String>();
-      _responseBuffer.clear();
-      
-      // 设置超时定时器
-      _responseTimer = Timer(const Duration(seconds: 10), () {
-        if (_commandCompleter != null && !_commandCompleter!.isCompleted) {
-          _commandCompleter!.completeError(TimeoutException('命令超时'));
-          _commandCompleter = null;
-          _responseBuffer.clear();
-        }
-      });
-      
-      // 发送命令
-      _socket!.write(command);
-      await _socket!.flush();
-      
-      // 等待响应
-      final response = await _commandCompleter!.future;
-      
-      return response;
-      
-    } catch (e) {
-      print('发送命令失败: $e');
-      rethrow;
+    // 创建命令任务
+    final completer = Completer<String>();
+    final task = _CommandTask(command, completer);
+    
+    // 加入队列
+    _commandQueue.add(task);
+    
+    // 启动队列处理
+    _processCommandQueue();
+    
+    // 等待命令完成
+    return completer.future;
+  }
+  
+  // 处理命令队列
+  Future<void> _processCommandQueue() async {
+    // 如果已经在处理队列，直接返回
+    if (_isProcessingQueue) {
+      return;
     }
+    
+    _isProcessingQueue = true;
+    
+    try {
+      while (_commandQueue.isNotEmpty) {
+        final task = _commandQueue.removeFirst();
+        
+        try {
+          // 执行命令并等待响应
+          final response = await _executeCommand(task.command);
+          task.completer.complete(response);
+          
+          // 命令间隔延迟
+          if (_commandQueue.isNotEmpty) {
+            print('⏱️ 命令间隔控制：等待 ${_commandDelay.inMilliseconds}ms');
+            await Future.delayed(_commandDelay);
+          }
+        } catch (e) {
+          task.completer.completeError(e);
+          // 出错也要延迟，避免快速重试
+          if (_commandQueue.isNotEmpty) {
+            await Future.delayed(_commandDelay);
+          }
+        }
+      }
+    } finally {
+      _isProcessingQueue = false;
+    }
+  }
+  
+  // 执行单个命令
+  Future<String> _executeCommand(String command) async {
+    // 确保命令以\r\n结尾
+    if (!command.endsWith('\r\n')) {
+      command += '\r\n';
+    }
+    
+    print('📤 发送命令: ${command.trim()}');
+    
+    // 创建响应完成器
+    _commandCompleter = Completer<String>();
+    _responseBuffer.clear();
+    
+    // 设置超时定时器
+    _responseTimer = Timer(const Duration(seconds: 10), () {
+      if (_commandCompleter != null && !_commandCompleter!.isCompleted) {
+        _commandCompleter!.completeError(TimeoutException('命令超时'));
+        _commandCompleter = null;
+        _responseBuffer.clear();
+      }
+    });
+    
+    // 发送命令
+    _socket!.write(command);
+    await _socket!.flush();
+    
+    // 等待响应
+    final response = await _commandCompleter!.future;
+    
+    return response;
   }
 
   // 测试网络连接
@@ -472,6 +535,9 @@ class TcpService extends GetxService {
     _reconnectTimer?.cancel();
     _responseTimer?.cancel();
     
+    // 清空命令队列
+    _commandQueue.clear();
+    
     // 同步关闭socket
     _socket?.close();
     _socket = null;
@@ -487,3 +553,10 @@ class TcpService extends GetxService {
   }
 }
 
+// 命令任务类
+class _CommandTask {
+  final String command;
+  final Completer<String> completer;
+  
+  _CommandTask(this.command, this.completer);
+}
