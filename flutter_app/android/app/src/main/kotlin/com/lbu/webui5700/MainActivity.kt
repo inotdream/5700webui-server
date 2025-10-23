@@ -1,4 +1,4 @@
-package com.at_gateway_app.webui5700
+package com.lbu.webui5700
 
 import io.flutter.embedding.android.FlutterActivity
 
