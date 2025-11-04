@@ -101,8 +101,8 @@ class WebSocketServerService extends GetxService {
         path = 'index.html';
       }
       
-      // 特殊处理config.json，动态生成配置
-      if (path == 'config.json') {
+      // 特殊处理config.json和cgi-bin/at-ws-info，动态生成配置
+      if (path == 'config.json' || path == 'cgi-bin/at-ws-info') {
         return await _generateConfigJson();
       }
       
