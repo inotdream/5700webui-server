@@ -43,25 +43,19 @@ jobs:
     - name: Create DMG
       run: |
         cd flutter_app/build/macos/Build/Products/Release
-        # 创建临时目录
-        mkdir -p 5700WebUi.app/Contents/MacOS
-        # 复制应用文件
-        cp -r 5700WebUi.app/* 5700WebUi.app/Contents/MacOS/ 2>/dev/null || true
-        
-        # 使用hdiutil创建DMG
-        hdiutil create -volname "5700WebUi" -srcfolder 5700WebUi.app -ov -format UDZO 5700WebUi.dmg
+        hdiutil create -volname "NetBox5700" -srcfolder "NetBox 5700.app" -ov -format UDZO NetBox5700.dmg
         
     - name: Upload DMG
       uses: actions/upload-artifact@v4
       with:
         name: macos-dmg
-        path: flutter_app/build/macos/Build/Products/Release/5700WebUi.dmg
+        path: flutter_app/build/macos/Build/Products/Release/NetBox5700.dmg
         
     - name: Create Draft Release (on main branch)
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       uses: softprops/action-gh-release@v1
       with:
-        files: flutter_app/build/macos/Build/Products/Release/5700WebUi.dmg
+        files: flutter_app/build/macos/Build/Products/Release/NetBox5700.dmg
         generate_release_notes: true
         draft: true
         prerelease: true

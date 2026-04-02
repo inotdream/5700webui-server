@@ -1,7 +1,7 @@
 name: webui_5700
-description: 5700WebUi - AT命令网关客户端，连接4G/5G模块的移动应用
+description: NetBox 5700 - 5G模块管理与网络诊断工具箱（AT控制台/网络检测/NAT诊断/带宽测试）
 publish_to: 'none'
-version: 1.0.2+2
+version: 1.0.6+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -43,6 +43,8 @@ dependencies:
   # UI相关
   flutter_screenutil: ^5.9.0
   cupertino_icons: ^1.0.6
+  flex_color_scheme: ^8.0.0
+  google_fonts: ^6.1.0
   
   # 图表
   fl_chart: ^0.66.0

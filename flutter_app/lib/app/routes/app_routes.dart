@@ -7,6 +7,8 @@ abstract class Routes {
   static const SMS = _Paths.SMS;
   static const CONSOLE = _Paths.CONSOLE;
   static const SETTINGS = _Paths.SETTINGS;
+  static const NETWORK = _Paths.NETWORK;
+  static const SPEEDTEST = _Paths.SPEEDTEST;
 }
 
 abstract class _Paths {
@@ -16,5 +18,7 @@ abstract class _Paths {
   static const SMS = '/sms';
   static const CONSOLE = '/console';
   static const SETTINGS = '/settings';
+  static const NETWORK = '/network';
+  static const SPEEDTEST = '/speedtest';
 }
 

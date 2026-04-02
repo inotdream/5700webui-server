@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
       splitScreenMode: true,
       builder: (_, child) {
         return GetMaterialApp(
-          title: '5700Webui',
+          title: 'NetBox 5700',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

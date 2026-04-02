@@ -96,14 +96,13 @@ jobs:
     - name: Create DMG
       run: |
         cd flutter_app/build/macos/Build/Products/Release
-        # 创建DMG
-        hdiutil create -volname "5700WebUi" -srcfolder 5700WebUi.app -ov -format UDZO 5700WebUi.dmg
+        hdiutil create -volname "NetBox5700" -srcfolder "NetBox 5700.app" -ov -format UDZO NetBox5700.dmg
         
     - name: Upload macOS DMG
       uses: actions/upload-artifact@v4
       with:
         name: macos-dmg
-        path: flutter_app/build/macos/Build/Products/Release/5700WebUi.dmg
+        path: flutter_app/build/macos/Build/Products/Release/NetBox5700.dmg
 
   build-ios:
     runs-on: macos-latest
@@ -142,14 +141,14 @@ jobs:
         cd flutter_app/build/ios/iphoneos
         mkdir -p Payload
         cp -r Runner.app Payload/
-        zip -r 5700WebUi-iOS.ipa Payload
+        zip -r NetBox5700-iOS.ipa Payload
         rm -rf Payload
         
     - name: Upload iOS IPA
       uses: actions/upload-artifact@v4
       with:
         name: ios-ipa
-        path: flutter_app/build/ios/iphoneos/5700WebUi-iOS.ipa
+        path: flutter_app/build/ios/iphoneos/NetBox5700-iOS.ipa
 
   create-release:
     needs: [build-android, build-macos, build-ios]
@@ -186,36 +185,21 @@ jobs:
           ./artifacts/android/app-arm64-v8a-release.apk
           ./artifacts/android/app-armeabi-v7a-release.apk
           ./artifacts/android/app-x86_64-release.apk
-          ./artifacts/macos/5700WebUi.dmg
-          ./artifacts/ios/5700WebUi-iOS.ipa
+          ./artifacts/macos/NetBox5700.dmg
+          ./artifacts/ios/NetBox5700-iOS.ipa
         generate_release_notes: true
         draft: true
         prerelease: true
-        tag_name: "v1.0.2-build-${{ github.run_number }}"
-        name: "5700WebUi v1.0.2 Build ${{ github.run_number }}"
+        tag_name: "v1.0.6-build-${{ github.run_number }}"
+        name: "NetBox 5700 v1.0.6 Build ${{ github.run_number }}"
         body: |
-          ## 📱 5700WebUi v1.0.2 多平台构建
+          ## NetBox 5700 v1.0.6
           
-          ### 🎯 本次构建包含：
-          - **Android APK** (通用版本)
-          - **Android APK** (分架构版本: ARM64, ARMv7, x86_64)
-          - **macOS DMG** (适用于M1/M2和Intel芯片)
-          - **iOS IPA** (iPhone/iPad通用，需要签名后安装)
+          ### 下载：
+          - **Android APK** (通用 / ARM64 / ARMv7 / x86_64)
+          - **macOS DMG**
+          - **iOS IPA** (需重签名)
           
-          ### 📋 安装说明：
-          - **Android**: 下载对应架构的APK文件安装
-          - **macOS**: 下载DMG文件，拖拽到Applications文件夹
-          - **iOS**: 下载IPA文件，需要重新签名后通过Xcode或第三方工具安装
-          
-          ### 📦 应用信息：
-          - **包名**: com.lbu.webui5700
-          - **版本**: 1.0.2
-          
-          ### 🔧 功能特性：
-          - AT命令网关客户端
-          - 支持4G/5G模块连接
-          - WebSocket服务器
-          - AT命令队列机制，改善并发问题
-          - 多平台支持(Android/iOS/macOS)
+          ### 包名: com.lbu.webui5700
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -5,6 +5,8 @@ import '../../sms/controllers/sms_controller.dart';
 import '../../console/controllers/console_controller.dart';
 import '../../webview/controllers/webview_controller.dart';
 import '../../settings/controllers/settings_controller.dart';
+import '../../network/controllers/network_controller.dart';
+import '../../speedtest/controllers/speedtest_controller.dart';
 
 class HomeBinding extends Bindings {
   @override
@@ -15,6 +17,8 @@ class HomeBinding extends Bindings {
     Get.lazyPut<ConsoleController>(() => ConsoleController());
     Get.lazyPut<WebViewController>(() => WebViewController());
     Get.lazyPut<SettingsController>(() => SettingsController());
+    Get.lazyPut<NetworkController>(() => NetworkController());
+    Get.lazyPut<SpeedTestController>(() => SpeedTestController());
   }
 }
 

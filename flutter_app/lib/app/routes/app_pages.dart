@@ -9,6 +9,10 @@ import '../modules/console/bindings/console_binding.dart';
 import '../modules/console/views/console_view.dart';
 import '../modules/settings/bindings/settings_binding.dart';
 import '../modules/settings/views/settings_view.dart';
+import '../modules/network/bindings/network_binding.dart';
+import '../modules/network/views/network_view.dart';
+import '../modules/speedtest/bindings/speedtest_binding.dart';
+import '../modules/speedtest/views/speedtest_view.dart';
 
 part 'app_routes.dart';
 
@@ -42,6 +46,16 @@ class AppPages {
       name: _Paths.SETTINGS,
       page: () => const SettingsView(),
       binding: SettingsBinding(),
+    ),
+    GetPage(
+      name: _Paths.NETWORK,
+      page: () => const NetworkView(),
+      binding: NetworkBinding(),
+    ),
+    GetPage(
+      name: _Paths.SPEEDTEST,
+      page: () => const SpeedTestView(),
+      binding: SpeedTestBinding(),
     ),
   ];
 }
