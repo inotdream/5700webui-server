@@ -1,17 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:at_gateway_app/main.dart';
+import 'package:webui_5700/app/utils/at_protocol.dart';
 
 void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    // This is a basic smoke test to verify the app can be built
-    // You can add more specific tests as needed
-    
-    // Build our app
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our app builds without errors
-    expect(find.byType(MaterialApp), findsOneWidget);
+  test('AT 行解析可独立运行', () {
+    final assembler = AtLineAssembler();
+    expect(assembler.add('OK\r\n'), ['OK']);
+    expect(AtFrameParser.isFinalResultLine('OK'), isTrue);
   });
 }
-

@@ -1,6 +1,5 @@
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color primaryColor = Color(0xFF0052D9);
@@ -72,12 +71,6 @@ class AppTheme {
     subThemesData: _subThemes,
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     useMaterial3: true,
-    textTheme: GoogleFonts.notoSansScTextTheme(
-      ThemeData(brightness: Brightness.light).textTheme,
-    ),
-    primaryTextTheme: GoogleFonts.notoSansScTextTheme(
-      ThemeData(brightness: Brightness.light).textTheme,
-    ),
   );
 
   static ThemeData darkTheme = FlexThemeData.dark(
@@ -98,11 +91,5 @@ class AppTheme {
     ),
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     useMaterial3: true,
-    textTheme: GoogleFonts.notoSansScTextTheme(
-      ThemeData(brightness: Brightness.dark).textTheme,
-    ),
-    primaryTextTheme: GoogleFonts.notoSansScTextTheme(
-      ThemeData(brightness: Brightness.dark).textTheme,
-    ),
   );
 }

@@ -1,24 +1,31 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import '../../../services/tcp_service.dart';
 import '../../../data/models/sms_model.dart';
 
 class SmsController extends GetxController {
   final _tcpService = Get.find<TcpService>();
-  
+
   final smsList = <SmsModel>[].obs;
   final isLoading = false.obs;
+
+  StreamSubscription<SmsModel>? _smsSub;
 
   @override
   void onInit() {
     super.onInit();
-    
-    // 监听新短信
-    _tcpService.smsStream.listen((sms) {
+
+    _smsSub = _tcpService.smsStream.listen((sms) {
       smsList.insert(0, sms);
     });
-    
-    // 加载短信列表
+
     loadSms();
+  }
+
+  @override
+  void onClose() {
+    _smsSub?.cancel();
+    super.onClose();
   }
 
   Future<void> loadSms() async {

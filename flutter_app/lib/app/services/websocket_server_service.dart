@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:get/get.dart';
 import 'package:shelf/shelf.dart' as shelf;
@@ -8,6 +9,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:mime/mime.dart';
+import '../utils/app_log.dart';
 import 'tcp_service.dart';
 import 'storage_service.dart';
 
@@ -22,11 +24,17 @@ class WebSocketServerService extends GetxService {
   final isRunning = false.obs;
   final serverPort = 8765.obs;
   final clientCount = 0.obs;
+  Future<void>? _startFuture;
   
   StreamSubscription? _smsSubscription;
   StreamSubscription? _callSubscription;
   StreamSubscription? _signalSubscription;
   StreamSubscription? _rawDataSubscription;
+
+  final _assetCache = <String, _CachedAsset>{};
+  List<InternetAddress>? _cachedLanIps;
+  DateTime? _lanIpsCachedAt;
+  static const _lanIpTtl = Duration(seconds: 30);
 
   @override
   void onInit() {
@@ -106,34 +114,24 @@ class WebSocketServerService extends GetxService {
         return await _generateConfigJson();
       }
       
-      // 构建asset路径
       final assetPath = 'assets/web/$path';
-      
-      print('📄 请求文件: $path -> $assetPath');
-      
+      appLog('📄 请求文件: $path -> $assetPath');
+
       try {
-        // 从assets读取文件
-        final data = await rootBundle.load(assetPath);
-        final bytes = data.buffer.asUint8List();
-        
-        // 确定MIME类型
-        final mimeType = lookupMimeType(path) ?? 'application/octet-stream';
-        
+        final cached = await _loadAsset(assetPath, path);
         return shelf.Response.ok(
-          bytes,
+          cached.bytes,
           headers: {
-            'Content-Type': mimeType,
+            'Content-Type': cached.mimeType,
             'Cache-Control': 'public, max-age=3600',
           },
         );
       } catch (e) {
-        print('❌ 文件未找到: $assetPath');
-        // 如果文件不存在，返回index.html（用于SPA路由）
+        appLog('❌ 文件未找到: $assetPath');
         try {
-          final indexData = await rootBundle.load('assets/web/index.html');
-          final indexBytes = indexData.buffer.asUint8List();
+          final index = await _loadAsset('assets/web/index.html', 'index.html');
           return shelf.Response.ok(
-            indexBytes,
+            index.bytes,
             headers: {'Content-Type': 'text/html'},
           );
         } catch (e2) {
@@ -141,36 +139,62 @@ class WebSocketServerService extends GetxService {
         }
       }
     } catch (e) {
-      print('❌ 处理静态文件请求失败: $e');
+      appLog('❌ 处理静态文件请求失败: $e');
       return shelf.Response.internalServerError(body: 'Internal server error');
     }
   }
   
+  Future<_CachedAsset> _loadAsset(String assetPath, String requestPath) async {
+    final hit = _assetCache[assetPath];
+    if (hit != null) return hit;
+
+    final data = await rootBundle.load(assetPath);
+    final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    final mimeType = lookupMimeType(requestPath) ?? 'application/octet-stream';
+    final cached = _CachedAsset(bytes: Uint8List.fromList(bytes), mimeType: mimeType);
+    _assetCache[assetPath] = cached;
+    return cached;
+  }
+
+  Future<List<InternetAddress>> _lanIpv4Addresses() async {
+    final now = DateTime.now();
+    if (_cachedLanIps != null &&
+        _lanIpsCachedAt != null &&
+        now.difference(_lanIpsCachedAt!) < _lanIpTtl) {
+      return _cachedLanIps!;
+    }
+
+    final addresses = <InternetAddress>[];
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLoopback: false,
+      );
+      for (final interface in interfaces) {
+        addresses.addAll(interface.addresses);
+      }
+    } catch (e) {
+      appLog('⚠️ 获取网络接口失败: $e');
+    }
+    _cachedLanIps = addresses;
+    _lanIpsCachedAt = now;
+    return addresses;
+  }
+
   /// 动态生成config.json
   Future<shelf.Response> _generateConfigJson() async {
     try {
-      // 获取本地IP地址（优先使用WiFi地址）
       String host = '127.0.0.1';
-      
-      // 尝试从已获取的IP列表中选择合适的地址
-      // 优先选择192.168.x.x或10.x.x.x的地址
       try {
-        final interfaces = await NetworkInterface.list();
-        for (var interface in interfaces) {
-          for (var addr in interface.addresses) {
-            if (addr.type == InternetAddressType.IPv4) {
-              final ip = addr.address;
-              // 优先使用局域网地址
-              if (ip.startsWith('192.168.') || ip.startsWith('10.')) {
-                host = ip;
-                break;
-              }
-            }
+        for (final addr in await _lanIpv4Addresses()) {
+          final ip = addr.address;
+          if (ip.startsWith('192.168.') || ip.startsWith('10.')) {
+            host = ip;
+            break;
           }
-          if (host != '127.0.0.1') break;
         }
       } catch (e) {
-        print('⚠️ 获取网络接口失败: $e');
+        appLog('⚠️ 获取网络接口失败: $e');
       }
       
       final config = {
@@ -182,7 +206,7 @@ class WebSocketServerService extends GetxService {
       };
       
       final configJson = jsonEncode(config);
-      print('📄 动态生成 config.json: $configJson');
+      appLog('📄 动态生成 config.json: $configJson');
       
       return shelf.Response.ok(
         configJson,
@@ -192,7 +216,7 @@ class WebSocketServerService extends GetxService {
         },
       );
     } catch (e) {
-      print('❌ 生成config.json失败: $e');
+      appLog('❌ 生成config.json失败: $e');
       // 返回默认配置
       final defaultConfig = {
         'status': 'false',  // 修改为你想要的值
@@ -211,16 +235,29 @@ class WebSocketServerService extends GetxService {
   /// 启动WebSocket服务器
   Future<void> startServer({int? port}) async {
     if (isRunning.value) {
-      print('WebSocket服务器已在运行');
+      appLog('WebSocket服务器已在运行');
+      return;
+    }
+    if (_startFuture != null) {
+      await _startFuture;
       return;
     }
 
+    final started = _startServerInternal(port);
+    _startFuture = started;
     try {
-      // 如果没有指定端口，从存储中读取
+      await started;
+    } finally {
+      _startFuture = null;
+    }
+  }
+
+  Future<void> _startServerInternal(int? port) async {
+    try {
       serverPort.value = port ?? _storageService.wsPort;
 
       final wsHandler = webSocketHandler((WebSocketChannel webSocket) {
-        print('新的WebSocket客户端连接');
+        appLog('新的WebSocket客户端连接');
         _clients.add(webSocket);
         clientCount.value = _clients.length;
 
@@ -230,12 +267,12 @@ class WebSocketServerService extends GetxService {
             _handleClientMessage(webSocket, message);
           },
           onDone: () {
-            print('WebSocket客户端断开连接');
+            appLog('WebSocket客户端断开连接');
             _clients.remove(webSocket);
             clientCount.value = _clients.length;
           },
           onError: (error) {
-            print('WebSocket客户端错误: $error');
+            appLog('WebSocket客户端错误: $error');
             _clients.remove(webSocket);
             clientCount.value = _clients.length;
           },
@@ -260,9 +297,9 @@ class WebSocketServerService extends GetxService {
       );
 
       isRunning.value = true;
-      print('✅ WebSocket服务器启动成功: ws://0.0.0.0:${serverPort.value}');
+      appLog('✅ WebSocket服务器启动成功: ws://0.0.0.0:${serverPort.value}');
     } catch (e) {
-      print('❌ WebSocket服务器启动失败: $e');
+      appLog('❌ WebSocket服务器启动失败: $e');
       isRunning.value = false;
       rethrow;
     }
@@ -285,9 +322,9 @@ class WebSocketServerService extends GetxService {
       _server = null;
 
       isRunning.value = false;
-      print('WebSocket服务器已停止');
+      appLog('WebSocket服务器已停止');
     } catch (e) {
-      print('停止WebSocket服务器时出错: $e');
+      appLog('停止WebSocket服务器时出错: $e');
     }
   }
 
@@ -300,7 +337,7 @@ class WebSocketServerService extends GetxService {
       }
 
       final String command = message.toString().trim();
-      print('📥 收到WebSocket命令: $command');
+      appLog('📥 收到WebSocket命令: $command');
 
       // 通过TCP发送AT命令
       if (_tcpService.isConnected.value) {
@@ -341,7 +378,7 @@ class WebSocketServerService extends GetxService {
         }));
       }
     } catch (e) {
-      print('处理WebSocket消息失败: $e');
+      appLog('处理WebSocket消息失败: $e');
       client.sink.add(jsonEncode({
         'success': false,
         'data': null,
@@ -361,7 +398,7 @@ class WebSocketServerService extends GetxService {
       try {
         client.sink.add(message);
       } catch (e) {
-        print('发送消息到客户端失败: $e');
+        appLog('发送消息到客户端失败: $e');
         deadClients.add(client);
       }
     }
@@ -376,7 +413,7 @@ class WebSocketServerService extends GetxService {
   /// 修改WebSocket服务器端口
   Future<bool> changePort(int newPort) async {
     if (newPort < 1024 || newPort > 65535) {
-      print('❌ 端口号必须在1024-65535之间');
+      appLog('❌ 端口号必须在1024-65535之间');
       return false;
     }
 
@@ -390,10 +427,10 @@ class WebSocketServerService extends GetxService {
       // 使用新端口重新启动服务器
       await startServer(port: newPort);
       
-      print('✅ WebSocket端口已修改为: $newPort');
+      appLog('✅ WebSocket端口已修改为: $newPort');
       return true;
     } catch (e) {
-      print('❌ 修改WebSocket端口失败: $e');
+      appLog('❌ 修改WebSocket端口失败: $e');
       return false;
     }
   }
@@ -434,38 +471,34 @@ class WebSocketServerService extends GetxService {
 
   /// 获取所有网络接口的IP地址（WebSocket）
   Future<List<String>> getLocalIPAddresses() async {
-    final addresses = <String>[];
     try {
-      final interfaces = await NetworkInterface.list();
-      for (var interface in interfaces) {
-        for (var addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4) {
-            addresses.add('ws://${addr.address}:${serverPort.value}');
-          }
-        }
-      }
+      return [
+        for (final addr in await _lanIpv4Addresses())
+          'ws://${addr.address}:${serverPort.value}',
+      ];
     } catch (e) {
-      print('获取IP地址失败: $e');
+      appLog('获取IP地址失败: $e');
+      return const [];
     }
-    return addresses;
   }
 
   /// 获取所有网络接口的HTTP地址
   Future<List<String>> getHttpAddresses() async {
-    final addresses = <String>[];
     try {
-      final interfaces = await NetworkInterface.list();
-      for (var interface in interfaces) {
-        for (var addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4) {
-            addresses.add('http://${addr.address}:${serverPort.value}');
-          }
-        }
-      }
+      return [
+        for (final addr in await _lanIpv4Addresses())
+          'http://${addr.address}:${serverPort.value}',
+      ];
     } catch (e) {
-      print('获取HTTP地址失败: $e');
+      appLog('获取HTTP地址失败: $e');
+      return const [];
     }
-    return addresses;
   }
+}
+
+class _CachedAsset {
+  final Uint8List bytes;
+  final String mimeType;
+  const _CachedAsset({required this.bytes, required this.mimeType});
 }
 

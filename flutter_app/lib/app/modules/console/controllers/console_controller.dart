@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../../../services/tcp_service.dart';
@@ -6,27 +7,29 @@ class ConsoleController extends GetxController {
   final _tcpService = Get.find<TcpService>();
   final commandController = TextEditingController();
   final scrollController = ScrollController();
-  
+
   final logs = <Map<String, dynamic>>[].obs;
   final commandHistory = <String>[].obs;
   final historyIndex = 0.obs;
 
+  static const _maxLogs = 300;
+  static const _maxHistory = 50;
+
+  StreamSubscription<String>? _consoleSub;
+  StreamSubscription<String>? _rawSub;
+
   @override
   void onInit() {
     super.onInit();
-    
-    // 监听AT命令响应（用于AT控制台显示）
-    _tcpService.consoleResponseStream.listen((response) {
-      print('🎯 AT控制台收到命令响应: $response');
+
+    _consoleSub = _tcpService.consoleResponseStream.listen((response) {
       addLog('📥 $response', false);
     });
-    
-    // 监听主动上报数据
-    _tcpService.rawDataStream.listen((data) {
-      print('🎯 AT控制台收到主动上报: $data');
+
+    _rawSub = _tcpService.rawDataStream.listen((data) {
       addLog('📡 $data', false);
     });
-    
+
     _addWelcomeMessage();
   }
 
@@ -42,16 +45,17 @@ class ConsoleController extends GetxController {
     final command = commandController.text.trim();
     if (command.isEmpty) return;
     
-    // 添加到历史记录
     commandHistory.insert(0, command);
+    if (commandHistory.length > _maxHistory) {
+      commandHistory.removeRange(_maxHistory, commandHistory.length);
+    }
     historyIndex.value = -1;
     
     addLog('📤 $command', true);
     commandController.clear();
     
     try {
-      final response = await _tcpService.sendCommand(command);
-      // 响应会通过rawDataStream自动显示
+      await _tcpService.sendCommand(command);
     } catch (e) {
       addLog('❌ 错误: $e', false);
     }
@@ -63,8 +67,10 @@ class ConsoleController extends GetxController {
       'isSent': isSent,
       'time': DateTime.now(),
     });
-    
-    // 自动滚动到底部
+    if (logs.length > _maxLogs) {
+      logs.removeRange(0, logs.length - _maxLogs);
+    }
+
     Future.delayed(const Duration(milliseconds: 100), () {
       if (scrollController.hasClients) {
         scrollController.animateTo(
@@ -101,6 +107,8 @@ class ConsoleController extends GetxController {
 
   @override
   void onClose() {
+    _consoleSub?.cancel();
+    _rawSub?.cancel();
     commandController.dispose();
     scrollController.dispose();
     super.onClose();

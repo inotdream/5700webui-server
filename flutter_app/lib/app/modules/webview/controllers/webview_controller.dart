@@ -30,12 +30,8 @@ class WebViewController extends GetxController {
     try {
       errorMessage.value = '';
       
-      // 等待WebSocket服务器启动
       if (!_wsService.isRunning.value) {
-        print('WebSocket服务器未运行，正在启动...');
         await _wsService.startServer();
-        // 等待服务器完全启动
-        await Future.delayed(const Duration(milliseconds: 500));
       }
       
       isServerReady.value = true;

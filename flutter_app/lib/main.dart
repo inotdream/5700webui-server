@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -7,28 +8,41 @@ import 'app/core/theme/app_theme.dart';
 import 'app/services/storage_service.dart';
 import 'app/services/tcp_service.dart';
 import 'app/services/websocket_server_service.dart';
+import 'app/utils/app_log.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 设置状态栏样式
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  
-  // 初始化服务
+
   await Get.putAsync(() => StorageService().init());
-  Get.put(TcpService());  // TCP服务连接到AT设备
-  Get.put(WebSocketServerService());  // WebSocket服务器为Web前端提供服务
-  
+  Get.put(TcpService());
+  final wsServer = Get.put(WebSocketServerService());
+  unawaited(wsServer.startServer().catchError((Object e) {
+    appLog('WebSocket服务器启动失败: $e');
+  }));
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  ThemeMode _resolveThemeMode() {
+    switch (Get.find<StorageService>().themeMode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +56,7 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.system,
+          themeMode: _resolveThemeMode(),
           initialRoute: AppPages.INITIAL,
           getPages: AppPages.routes,
           defaultTransition: Transition.fadeIn,

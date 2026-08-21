@@ -10,24 +10,28 @@ import '../../settings/views/settings_view.dart';
 class HomeView extends GetView<HomeController> {
   const HomeView({super.key});
 
+  static const _pages = <Widget>[
+    ConsoleView(),
+    WebViewView(),
+    NetworkView(),
+    SpeedTestView(),
+    SettingsView(),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      const ConsoleView(),
-      const WebViewView(),
-      const NetworkView(),
-      const SpeedTestView(),
-      const SettingsView(),
-    ];
-
     return Scaffold(
-      body: Obx(() => AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: KeyedSubtree(
-          key: ValueKey(controller.currentIndex.value),
-          child: pages[controller.currentIndex.value],
-        ),
-      )),
+      body: Obx(() {
+        final index = controller.currentIndex.value;
+        final visited = Set<int>.from(controller.visitedPages);
+        return IndexedStack(
+          index: index,
+          children: [
+            for (var i = 0; i < _pages.length; i++)
+              visited.contains(i) ? _pages[i] : const SizedBox.shrink(),
+          ],
+        );
+      }),
       bottomNavigationBar: Obx(() => NavigationBar(
         selectedIndex: controller.currentIndex.value,
         onDestinationSelected: controller.changePage,
