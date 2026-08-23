@@ -137,6 +137,14 @@ class WebViewController extends GetxController {
     }
   }
   
+  /// 重新初始化WebView（错误/浏览器模式下的重试入口，不要直接调用onInit）
+  Future<void> retryInit() async {
+    errorMessage.value = '';
+    shouldUseBrowser.value = false;
+    isLoading.value = true;
+    await _initWebView();
+  }
+
   Future<void> reload() async {
     await webViewController.reload();
   }

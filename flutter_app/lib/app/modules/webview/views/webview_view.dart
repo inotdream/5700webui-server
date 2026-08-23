@@ -105,10 +105,7 @@ class WebViewView extends GetView<WebViewController> {
                       ),
                       const SizedBox(width: 12),
                       OutlinedButton.icon(
-                        onPressed: () {
-                          controller.shouldUseBrowser.value = false;
-                          controller.onInit();
-                        },
+                        onPressed: controller.retryInit,
                         icon: const Icon(Icons.refresh),
                         label: const Text('重试内嵌'),
                       ),
@@ -139,10 +136,7 @@ class WebViewView extends GetView<WebViewController> {
                       )),
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed: () {
-                      controller.errorMessage.value = '';
-                      controller.onInit();
-                    },
+                    onPressed: controller.retryInit,
                     icon: const Icon(Icons.refresh),
                     label: const Text('重试'),
                   ),

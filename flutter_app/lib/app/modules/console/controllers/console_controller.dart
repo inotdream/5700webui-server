@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../../../services/tcp_service.dart';
@@ -11,19 +12,20 @@ class ConsoleController extends GetxController {
   final commandHistory = <String>[].obs;
   final historyIndex = 0.obs;
 
+  StreamSubscription<String>? _responseSubscription;
+  StreamSubscription<String>? _rawDataSubscription;
+
   @override
   void onInit() {
     super.onInit();
     
     // 监听AT命令响应（用于AT控制台显示）
-    _tcpService.consoleResponseStream.listen((response) {
-      print('🎯 AT控制台收到命令响应: $response');
+    _responseSubscription = _tcpService.consoleResponseStream.listen((response) {
       addLog('📥 $response', false);
     });
     
     // 监听主动上报数据
-    _tcpService.rawDataStream.listen((data) {
-      print('🎯 AT控制台收到主动上报: $data');
+    _rawDataSubscription = _tcpService.rawDataStream.listen((data) {
       addLog('📡 $data', false);
     });
     
@@ -50,8 +52,8 @@ class ConsoleController extends GetxController {
     commandController.clear();
     
     try {
-      final response = await _tcpService.sendCommand(command);
-      // 响应会通过rawDataStream自动显示
+      // 响应会通过consoleResponseStream自动显示
+      await _tcpService.sendCommand(command);
     } catch (e) {
       addLog('❌ 错误: $e', false);
     }
@@ -101,6 +103,8 @@ class ConsoleController extends GetxController {
 
   @override
   void onClose() {
+    _responseSubscription?.cancel();
+    _rawDataSubscription?.cancel();
     commandController.dispose();
     scrollController.dispose();
     super.onClose();

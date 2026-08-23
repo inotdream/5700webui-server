@@ -147,6 +147,16 @@ class SettingsView extends GetView<SettingsController> {
           ),
           SizedBox(height: 4.h),
           Card(
+            child: Obx(() => SwitchListTile(
+              secondary: Icon(Icons.lan_rounded, color: colorScheme.primary),
+              title: const Text('允许局域网访问'),
+              subtitle: const Text('关闭时仅本机可访问Web界面（更安全）'),
+              value: controller.wsAllowLan.value,
+              onChanged: controller.toggleWsAllowLan,
+            )),
+          ),
+          SizedBox(height: 4.h),
+          Card(
             child: Padding(
               padding: EdgeInsets.all(16.w),
               child: Column(

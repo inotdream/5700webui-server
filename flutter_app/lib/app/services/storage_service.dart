@@ -9,14 +9,6 @@ class StorageService extends GetxService {
     return this;
   }
 
-  // 连接模式：tcp 或 websocket
-  String get connectionMode => _prefs.getString('connection_mode') ?? 'tcp';
-  set connectionMode(String value) => _prefs.setString('connection_mode', value);
-
-  // WebSocket服务器地址
-  String get serverUrl => _prefs.getString('server_url') ?? 'ws://192.168.8.1:8765';
-  set serverUrl(String value) => _prefs.setString('server_url', value);
-
   // TCP主机地址
   String get tcpHost => _prefs.getString('tcp_host') ?? '192.168.8.1';
   set tcpHost(String value) => _prefs.setString('tcp_host', value);
@@ -40,4 +32,9 @@ class StorageService extends GetxService {
   // WebSocket服务器端口
   int get wsPort => _prefs.getInt('ws_port') ?? 8765;
   set wsPort(int value) => _prefs.setInt('ws_port', value);
+
+  // 是否允许局域网访问内置Web/WebSocket服务器。
+  // 默认仅监听127.0.0.1，防止局域网内任意设备通过WebSocket发送AT命令。
+  bool get wsAllowLan => _prefs.getBool('ws_allow_lan') ?? false;
+  set wsAllowLan(bool value) => _prefs.setBool('ws_allow_lan', value);
 }

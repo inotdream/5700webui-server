@@ -15,6 +15,7 @@ class SettingsController extends GetxController {
   final autoConnect = true.obs;
   final enableNotification = true.obs;
   final themeMode = 'system'.obs;
+  final wsAllowLan = false.obs;
 
   @override
   void onInit() {
@@ -29,6 +30,7 @@ class SettingsController extends GetxController {
     autoConnect.value = _storageService.autoConnect;
     enableNotification.value = _storageService.enableNotification;
     themeMode.value = _storageService.themeMode;
+    wsAllowLan.value = _storageService.wsAllowLan;
   }
 
   Future<void> saveTcpConfig() async {
@@ -63,6 +65,16 @@ class SettingsController extends GetxController {
   void toggleNotification(bool value) {
     enableNotification.value = value;
     _storageService.enableNotification = value;
+  }
+
+  Future<void> toggleWsAllowLan(bool value) async {
+    wsAllowLan.value = value;
+    await _wsServer.setAllowLan(value);
+    if (value) {
+      Get.snackbar('提示', '已允许局域网访问，局域网内设备可通过Web界面控制AT设备');
+    } else {
+      Get.snackbar('提示', '已恢复仅本机访问');
+    }
   }
 
   void changeTheme(String mode) {

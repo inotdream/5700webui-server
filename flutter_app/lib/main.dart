@@ -8,6 +8,17 @@ import 'app/services/storage_service.dart';
 import 'app/services/tcp_service.dart';
 import 'app/services/websocket_server_service.dart';
 
+ThemeMode themeModeFromString(String mode) {
+  switch (mode) {
+    case 'light':
+      return ThemeMode.light;
+    case 'dark':
+      return ThemeMode.dark;
+    default:
+      return ThemeMode.system;
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -20,15 +31,17 @@ void main() async {
   );
   
   // 初始化服务
-  await Get.putAsync(() => StorageService().init());
+  final storageService = await Get.putAsync(() => StorageService().init());
   Get.put(TcpService());  // TCP服务连接到AT设备
   Get.put(WebSocketServerService());  // WebSocket服务器为Web前端提供服务
   
-  runApp(const MyApp());
+  runApp(MyApp(themeMode: themeModeFromString(storageService.themeMode)));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ThemeMode themeMode;
+
+  const MyApp({super.key, this.themeMode = ThemeMode.system});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +55,7 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.system,
+          themeMode: themeMode,
           initialRoute: AppPages.INITIAL,
           getPages: AppPages.routes,
           defaultTransition: Transition.fadeIn,

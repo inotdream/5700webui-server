@@ -62,8 +62,8 @@ class NetworkController extends GetxController {
   }
 
   Future<void> fetchPublicIpInfo() async {
+    final client = HttpClient();
     try {
-      final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 10);
       final request = await client.getUrl(Uri.parse(
         'http://ip-api.com/json/?lang=zh-CN&fields=status,message,query,isp,org,as,country,regionName,city,timezone',
@@ -71,7 +71,6 @@ class NetworkController extends GetxController {
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       final data = jsonDecode(body) as Map<String, dynamic>;
-      client.close();
 
       if (data['status'] == 'success') {
         publicIp.value = data['query'] ?? '';
@@ -87,6 +86,8 @@ class NetworkController extends GetxController {
       }
     } catch (e) {
       ipInfoError.value = '网络请求失败';
+    } finally {
+      client.close(force: true);
     }
   }
 
@@ -153,14 +154,13 @@ class NetworkController extends GetxController {
 
   Future<void> _testSingleTarget(_TestTarget target, int index) async {
     final stopwatch = Stopwatch()..start();
+    final client = HttpClient();
     try {
-      final client = HttpClient();
       client.connectionTimeout = const Duration(seconds: 8);
       final request = await client.getUrl(Uri.parse(target.url));
       final response = await request.close();
       await response.drain();
       stopwatch.stop();
-      client.close();
 
       connectivityResults[index] = ConnectivityResult(
         name: target.name,
@@ -179,6 +179,8 @@ class NetworkController extends GetxController {
         status: TestStatus.failed,
         error: _formatError(e),
       );
+    } finally {
+      client.close(force: true);
     }
   }
 

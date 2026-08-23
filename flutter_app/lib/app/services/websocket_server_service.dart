@@ -148,19 +148,16 @@ class WebSocketServerService extends GetxService {
   
   /// 动态生成config.json
   Future<shelf.Response> _generateConfigJson() async {
-    try {
-      // 获取本地IP地址（优先使用WiFi地址）
-      String host = '127.0.0.1';
-      
-      // 尝试从已获取的IP列表中选择合适的地址
-      // 优先选择192.168.x.x或10.x.x.x的地址
+    // 仅本机模式下WebSocket地址固定为回环地址；
+    // 允许局域网访问时优先返回局域网IP，便于其他设备上的Web前端连接
+    String host = '127.0.0.1';
+    if (_storageService.wsAllowLan) {
       try {
         final interfaces = await NetworkInterface.list();
         for (var interface in interfaces) {
           for (var addr in interface.addresses) {
             if (addr.type == InternetAddressType.IPv4) {
               final ip = addr.address;
-              // 优先使用局域网地址
               if (ip.startsWith('192.168.') || ip.startsWith('10.')) {
                 host = ip;
                 break;
@@ -172,40 +169,27 @@ class WebSocketServerService extends GetxService {
       } catch (e) {
         print('⚠️ 获取网络接口失败: $e');
       }
-      
-      final config = {
-        'status': 'false',  // 修改为你想要的值
-        'at': {
-          'host': host,
-          'port': serverPort.value,
-        },
-      };
-      
-      final configJson = jsonEncode(config);
-      print('📄 动态生成 config.json: $configJson');
-      
-      return shelf.Response.ok(
-        configJson,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      );
-    } catch (e) {
-      print('❌ 生成config.json失败: $e');
-      // 返回默认配置
-      final defaultConfig = {
-        'status': 'false',  // 修改为你想要的值
-        'at': {
-          'host': '127.0.0.1',
-          'port': serverPort.value,
-        },
-      };
-      return shelf.Response.ok(
-        jsonEncode(defaultConfig),
-        headers: {'Content-Type': 'application/json'},
-      );
     }
+
+    // status为原Python网关的登录状态占位字段，Web前端依赖该格式
+    final config = {
+      'status': 'false',
+      'at': {
+        'host': host,
+        'port': serverPort.value,
+      },
+    };
+
+    final configJson = jsonEncode(config);
+    print('📄 动态生成 config.json: $configJson');
+
+    return shelf.Response.ok(
+      configJson,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    );
   }
 
   /// 启动WebSocket服务器
@@ -253,14 +237,20 @@ class WebSocketServerService extends GetxService {
         return await _staticFileHandler(request);
       };
 
+      // 安全考虑：默认仅监听回环地址（服务器可执行任意AT命令且无鉴权），
+      // 用户在设置中显式开启后才监听局域网
+      final bindAddress = _storageService.wsAllowLan
+          ? InternetAddress.anyIPv4
+          : InternetAddress.loopbackIPv4;
+
       _server = await shelf_io.serve(
         handler,
-        InternetAddress.anyIPv4,
+        bindAddress,
         serverPort.value,
       );
 
       isRunning.value = true;
-      print('✅ WebSocket服务器启动成功: ws://0.0.0.0:${serverPort.value}');
+      print('✅ WebSocket服务器启动成功: ws://${bindAddress.address}:${serverPort.value}');
     } catch (e) {
       print('❌ WebSocket服务器启动失败: $e');
       isRunning.value = false;
@@ -403,6 +393,15 @@ class WebSocketServerService extends GetxService {
     return serverPort.value;
   }
 
+  /// 修改局域网访问开关并重启服务器使其生效
+  Future<void> setAllowLan(bool allow) async {
+    _storageService.wsAllowLan = allow;
+    if (isRunning.value) {
+      await stopServer();
+      await startServer();
+    }
+  }
+
   /// 检查端口是否可用
   Future<bool> isPortAvailable(int port) async {
     try {
@@ -427,13 +426,15 @@ class WebSocketServerService extends GetxService {
   /// 获取服务器地址
   String getServerAddress() {
     if (!isRunning.value) return '未运行';
-    
-    // 获取本地IP地址
-    return 'ws://0.0.0.0:${serverPort.value}';
+    final host = _storageService.wsAllowLan ? '0.0.0.0' : '127.0.0.1';
+    return 'ws://$host:${serverPort.value}';
   }
 
-  /// 获取所有网络接口的IP地址（WebSocket）
+  /// 获取所有可访问的WebSocket地址
   Future<List<String>> getLocalIPAddresses() async {
+    if (!_storageService.wsAllowLan) {
+      return ['ws://127.0.0.1:${serverPort.value}'];
+    }
     final addresses = <String>[];
     try {
       final interfaces = await NetworkInterface.list();
@@ -450,8 +451,11 @@ class WebSocketServerService extends GetxService {
     return addresses;
   }
 
-  /// 获取所有网络接口的HTTP地址
+  /// 获取所有可访问的HTTP地址
   Future<List<String>> getHttpAddresses() async {
+    if (!_storageService.wsAllowLan) {
+      return ['http://127.0.0.1:${serverPort.value}'];
+    }
     final addresses = <String>[];
     try {
       final interfaces = await NetworkInterface.list();
