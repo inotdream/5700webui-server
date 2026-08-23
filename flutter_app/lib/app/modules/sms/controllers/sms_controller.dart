@@ -97,6 +97,7 @@ class SmsController extends GetxController {
     }
   }
 
+  @override
   void refresh() {
     loadSms();
   }

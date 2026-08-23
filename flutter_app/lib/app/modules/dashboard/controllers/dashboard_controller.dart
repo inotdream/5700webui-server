@@ -43,6 +43,7 @@ class DashboardController extends GetxController {
     }
   }
 
+  @override
   void refresh() {
     _querySignalStrength();
   }
